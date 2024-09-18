@@ -19,11 +19,11 @@ mongoose
     .catch((err) => console.log(err));
 
 // Importer les routes
-const authRoutes = require("./routes/auth");
-const bookRoutes = require("./routes/books");
+const authRoutes = require('./routes/authRoutes');
+const bookRoutes = require('./routes/bookRoutes');
 
 // Utiliser les routes
-app.use("/api/auth", authRoutes);
+app.use('/api/auth', authRoutes);
 app.use("/api/books", bookRoutes);
 
 // Route de base
