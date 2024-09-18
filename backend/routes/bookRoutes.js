@@ -22,7 +22,10 @@ const storage = multer.diskStorage({
     },
 });
 
-const upload = multer({ storage });
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 2 * 1024 * 1024 }, // Limite à 2 Mo
+});
 
 // Routes pour les livres
 router.post("/", auth, upload.single("image"), addBook);

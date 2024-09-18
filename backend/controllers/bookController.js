@@ -1,16 +1,37 @@
 const Book = require('../models/Book');
 const path = require('path');
 const fs = require('fs');
+const sharp = require('sharp');
 
-// Ajouter un livre
+// Ajouter un livre avec conversion de l'image en .avif
 exports.addBook = async (req, res) => {
     console.log("Requête reçue pour ajouter un livre:", req.body);
 
     const bookData = JSON.parse(req.body.book);
     const { title, author, year, genre } = bookData;
-    const imageUrl = req.file ? req.file.path : "";
-
+    
     try {
+        // Convertir l'image en .avif si elle est présente
+        let imageUrl = '';
+        if (req.file) {
+            const avifFilePath = path.join('uploads', `${Date.now()}-converted.avif`);
+            await sharp(req.file.path)
+                .avif({ quality: 50 }) // Convertir en .avif avec 50% de qualité
+                .toFile(avifFilePath);
+            
+            // Supprimer l'image originale après conversion
+            fs.unlink(req.file.path, (err) => {
+                if (err) {
+                    console.error("Erreur lors de la suppression de l'image originale:", err);
+                } else {
+                    console.log("Image originale supprimée après conversion");
+                }
+            });
+            
+            imageUrl = avifFilePath; // Utiliser le chemin de l'image .avif
+        }
+
+        // Créer un nouveau livre
         const newBook = new Book({
             userId: req.user.userId,
             title,
@@ -31,7 +52,7 @@ exports.addBook = async (req, res) => {
     }
 };
 
-// Mettre à jour un livre
+// Mettre à jour un livre avec conversion de l'image en .avif
 exports.updateBook = async (req, res) => {
     try {
         console.log(`Mise à jour du livre avec l'ID: ${req.params.id}`);
@@ -43,9 +64,42 @@ exports.updateBook = async (req, res) => {
             return res.status(403).json({ message: "Non autorisé à modifier ce livre" });
         }
 
-        let imageUrl = book.imageUrl;
-        if (req.file) imageUrl = req.file.path;
+        let imageUrl = book.imageUrl; // Conserver l'ancienne image si aucune nouvelle n'est fournie
 
+        // Si une nouvelle image est uploadée, la convertir en .avif et supprimer l'ancienne
+        if (req.file) {
+            // Convertir l'image uploadée en format .avif avec qualité 50%
+            const avifFilePath = path.join('uploads', `${Date.now()}-converted.avif`);
+            await sharp(req.file.path)
+                .avif({ quality: 50 })
+                .toFile(avifFilePath);
+
+            // Supprimer l'image originale après conversion
+            fs.unlink(req.file.path, (err) => {
+                if (err) {
+                    console.error("Erreur lors de la suppression de l'image originale:", err);
+                } else {
+                    console.log("Image originale supprimée après conversion");
+                }
+            });
+
+            // Supprimer l'ancienne image si elle existe
+            if (book.imageUrl) {
+                const oldImagePath = path.join(__dirname, "..", book.imageUrl);
+                fs.unlink(oldImagePath, (err) => {
+                    if (err) {
+                        console.error("Erreur lors de la suppression de l'ancienne image:", err);
+                    } else {
+                        console.log("Ancienne image supprimée avec succès");
+                    }
+                });
+            }
+
+            // Mettre à jour le chemin de la nouvelle image
+            imageUrl = avifFilePath;
+        }
+
+        // Mettre à jour les autres champs du livre si fournis
         if (req.body.book) {
             const bookData = JSON.parse(req.body.book);
             book.title = bookData.title || book.title;
@@ -59,7 +113,10 @@ exports.updateBook = async (req, res) => {
             book.genre = req.body.genre || book.genre;
         }
 
+        // Mettre à jour l'URL de l'image dans le livre
         book.imageUrl = imageUrl;
+
+        // Sauvegarder les modifications
         const updatedBook = await book.save();
 
         console.log("Livre mis à jour avec succès:", updatedBook);
@@ -69,6 +126,7 @@ exports.updateBook = async (req, res) => {
         res.status(500).send("Erreur serveur");
     }
 };
+
 
 // Récupérer tous les livres
 exports.getAllBooks = async (req, res) => {
@@ -184,7 +242,13 @@ exports.addRating = async (req, res) => {
         book.averageRating = sumOfRatings / totalRatings;
 
         const updatedBook = await book.save();
-        res.json(updatedBook);
+
+        const bookWithFullImageUrl = {
+            ...updatedBook._doc,
+            imageUrl: `http://localhost:5000/${updatedBook.imageUrl}`,
+        };
+
+        res.json(bookWithFullImageUrl);
     } catch (err) {
         console.error("Erreur lors de l'ajout de la note:", err);
         res.status(500).send("Erreur serveur");
