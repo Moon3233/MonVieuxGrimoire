@@ -34,7 +34,7 @@ router.post('/signup', async (req, res) => {
             { expiresIn: '1h' },
             (err, token) => {
                 if (err) throw err;
-                res.json({ token });
+                res.json({ message: "Utilisateur créé avec succès", token });
             }
         );
     } catch (err) {
@@ -65,7 +65,8 @@ router.post('/login', async (req, res) => {
             { expiresIn: '1h' },
             (err, token) => {
                 if (err) throw err;
-                res.json({ token });
+                // Retourner le token ET userId dans la réponse
+                res.json({ token, userId: user.id });
             }
         );
     } catch (err) {
